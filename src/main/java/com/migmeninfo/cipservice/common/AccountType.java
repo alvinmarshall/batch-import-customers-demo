@@ -1,14 +1,10 @@
 package com.migmeninfo.cipservice.common;
 
-public enum CustomerType {
-    INDIVIDUAL("IND"),
-    ORGANISATION("ORG"),
-    FINANCIAL("FIN"),
-    OTHER("OTHER");
-
+public enum AccountType {
+    SAVINGS("Savings"), CURRENT("Current"), OTHER("Other");
     private final String name;
 
-    CustomerType(String name) {
+    AccountType(String name) {
         this.name = name;
     }
 
@@ -21,12 +17,12 @@ public enum CustomerType {
         return name;
     }
 
-    public static CustomerType fromString(String text) {
-        for (CustomerType type : CustomerType.values()) {
+    public static AccountType fromString(String text) {
+        for (AccountType type : AccountType.values()) {
             if (type.name.equalsIgnoreCase(text)) {
                 return type;
             }
         }
-        return CustomerType.OTHER;
+        return AccountType.OTHER;
     }
 }

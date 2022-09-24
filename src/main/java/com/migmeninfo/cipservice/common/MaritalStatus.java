@@ -1,10 +1,10 @@
 package com.migmeninfo.cipservice.common;
 
 public enum MaritalStatus {
-    SINGLE("single"),
-    MARRIED("married"),
-    DIVORCED("divorced"),
-    OTHER("other");
+    SINGLE("Single"),
+    MARRIED("Married"),
+    DIVORCED("Divorced"),
+    OTHER("Other");
     private final String name;
 
     MaritalStatus(String name) {
@@ -13,5 +13,19 @@ public enum MaritalStatus {
 
     public String getName() {
         return name;
+    }
+
+    @Override
+    public String toString() {
+        return name;
+    }
+
+    public static MaritalStatus fromString(String text) {
+        for (MaritalStatus status : MaritalStatus.values()) {
+            if (status.name.equalsIgnoreCase(text)) {
+                return status;
+            }
+        }
+        return MaritalStatus.OTHER;
     }
 }

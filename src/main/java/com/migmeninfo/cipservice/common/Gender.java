@@ -13,4 +13,18 @@ public enum Gender {
     public String getName() {
         return name;
     }
+
+    @Override
+    public String toString() {
+        return name;
+    }
+
+    public static Gender fromString(String text) {
+        for (Gender gender : Gender.values()) {
+            if (gender.name.equalsIgnoreCase(text)) {
+                return gender;
+            }
+        }
+        return Gender.OTHER;
+    }
 }

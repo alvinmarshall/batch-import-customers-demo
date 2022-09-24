@@ -3,7 +3,8 @@ package com.migmeninfo.cipservice.common;
 public enum TinType {
     ITIN("ITIN"),
     SSN("SSN"),
-    FOREIGN("EIN");
+    FOREIGN("EIN"),
+    UNKNOWN("UNKNOWN");
     private final String name;
 
     TinType(String name) {

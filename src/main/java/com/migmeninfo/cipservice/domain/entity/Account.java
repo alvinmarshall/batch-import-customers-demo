@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateDeserializer;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
-import com.migmeninfo.cipservice.common.CustomerType;
+import com.migmeninfo.cipservice.common.AccountType;
 import lombok.*;
 
 import javax.persistence.*;
@@ -33,10 +33,10 @@ public class Account extends BaseEntity implements Serializable {
     @JsonProperty("account_currency")
     private String currency;
 
-    @Column(name = "customer_type")
+    @Column(name = "account_type")
     @Enumerated(EnumType.STRING)
-    @JsonProperty("customer_type")
-    private CustomerType customerType;
+    @JsonProperty("account_type")
+    private AccountType accountType;
 
     @Column(name = "opening_method")
     @JsonProperty("account_opening_method")

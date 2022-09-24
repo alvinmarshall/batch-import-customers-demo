@@ -8,3 +8,22 @@ spring:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: update
+
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+
+batch-data:
+  ind: 'classpath:customers_ind.csv'
+  org: 'classpath:customers_org.csv'
+  addresses: 'classpath:addresses.csv'
+  business_units: 'classpath:business_units.csv'
+  documents: 'classpath:documents.csv'
+  accounts: 'classpath:accounts.csv'
+  products_offered: 'classpath:products_offered.csv'
+  relationships: 'classpath:relationships.csv'
+  markets_served: 'classpath:markets_served.csv'
+  countries_of_operation: 'classpath:countries_of_operation.csv'
+  beneficial_owners: 'classpath:beneficial_owners.csv'

@@ -1,6 +1,7 @@
 package com.migmeninfo.cipservice.domain.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -29,6 +30,7 @@ import java.util.Set;
 @Setter
 @Builder
 @ToString
+@JsonInclude(JsonInclude.Include.NON_DEFAULT)
 @TypeDef(name = "json", typeClass = JsonType.class)
 public class Customer extends BaseEntity implements Serializable {
     private String ownership;
