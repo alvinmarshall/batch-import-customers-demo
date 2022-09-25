@@ -3,10 +3,12 @@ package com.migmeninfo.cipservice.batch.businessunit;
 import com.migmeninfo.cipservice.domain.entity.BusinessUnit;
 import com.migmeninfo.cipservice.domain.entity.Customer;
 import com.migmeninfo.cipservice.repository.CustomerRepository;
+import com.migmeninfo.cipservice.utils.BatchUtils;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
-import org.springframework.batch.item.ItemReader;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.LineMapper;
@@ -17,7 +19,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.FileUrlResource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.task.TaskExecutor;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -30,14 +34,30 @@ public class BusinessUnitBatchConfig {
     private StepBuilderFactory stepBuilderFactory;
     @Autowired
     private CustomerRepository customerRepository;
-    @Value("${batch-data.business_units}")
-    private Resource resource;
+    @Value("${batch-data.default}")
+    private Resource defaultResource;
 
-    public ItemReader<? extends BusinessUnitInput> businessUnitReader(Resource file) {
+    @Autowired
+    private TaskExecutor customerTaskExecutor;
+
+    @Bean
+    @StepScope
+    @SneakyThrows
+    public FlatFileItemReader<BusinessUnitInput> businessUnitReader(@Value("#{jobExecutionContext['unzip_files']}") Object files) {
+        String fileName = "business_units.csv";
+        log.info("files: {}", files);
         FlatFileItemReader<BusinessUnitInput> itemReader = new FlatFileItemReader<>();
-        itemReader.setResource(file);
         itemReader.setLinesToSkip(1);
         itemReader.setLineMapper(businessUnitLineMapper());
+        Optional<String> optionalFilePath = BatchUtils.getBatchFileName(files, fileName);
+        if (optionalFilePath.isEmpty()) {
+            itemReader.setResource(defaultResource);
+            return itemReader;
+        }
+        String filePath = optionalFilePath.get();
+        FileUrlResource urlResource = new FileUrlResource(filePath);
+        log.info("{}-file-exist: {}", fileName, urlResource.exists());
+        itemReader.setResource(urlResource);
         return itemReader;
     }
 
@@ -72,16 +92,16 @@ public class BusinessUnitBatchConfig {
                 customer.setBusinessUnits(businessUnits);
                 customerRepository.save(customer);
             }
-            log.info("business-unit: {}", businessUnit);
         });
     }
 
     @Bean
     public Step businessUnitStep() {
         return stepBuilderFactory.get("business_units-csv").<BusinessUnitInput, BusinessUnit>chunk(10)
-                .reader(businessUnitReader(resource))
+                .reader(businessUnitReader(null))
                 .processor(buinsessUnitProcessor())
                 .writer(businessUnitWriter())
+//                .taskExecutor(customerTaskExecutor)
                 .build();
     }
 

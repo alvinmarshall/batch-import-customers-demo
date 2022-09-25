@@ -1,13 +1,17 @@
 package com.migmeninfo.cipservice.batch.productoffered;
 
-import com.migmeninfo.cipservice.domain.entity.Customer;
 import com.migmeninfo.cipservice.domain.entity.ProductsOffered;
 import com.migmeninfo.cipservice.repository.CustomerRepository;
+import com.migmeninfo.cipservice.repository.ProductOfferedRepository;
+import com.migmeninfo.cipservice.utils.BatchUtils;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
-import org.springframework.batch.item.ItemReader;
-import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.core.configuration.annotation.StepScope;
+import org.springframework.batch.integration.async.AsyncItemProcessor;
+import org.springframework.batch.integration.async.AsyncItemWriter;
+import org.springframework.batch.item.data.RepositoryItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.LineMapper;
 import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
@@ -17,11 +21,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.FileUrlResource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.task.TaskExecutor;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Optional;
+import java.util.concurrent.Future;
 
 @Configuration
 @Slf4j
@@ -30,14 +36,34 @@ public class ProductOfferedBatchConfig {
     private StepBuilderFactory stepBuilderFactory;
     @Autowired
     private CustomerRepository customerRepository;
-    @Value("${batch-data.products_offered}")
-    private Resource resource;
+    @Value("${batch-data.default}")
+    private Resource defaultResource;
 
-    public ItemReader<? extends ProductOfferedInput> productOfferedReader(Resource file) {
+    @Autowired
+    private TaskExecutor customerTaskExecutor;
+    @Autowired
+    private ProductOfferedProcessor productOfferedProcessor;
+    @Autowired
+    private ProductOfferedRepository productOfferedRepository;
+
+    @Bean
+    @StepScope
+    @SneakyThrows
+    public FlatFileItemReader<ProductOfferedInput> productOfferedReader(@Value("#{jobExecutionContext['unzip_files']}") Object files) {
+        String fileName = "products_offered.csv";
+        log.info("files: {}", files);
         FlatFileItemReader<ProductOfferedInput> itemReader = new FlatFileItemReader<>();
-        itemReader.setResource(file);
         itemReader.setLinesToSkip(1);
         itemReader.setLineMapper(productOfferedLineMapper());
+        Optional<String> optionalFilePath = BatchUtils.getBatchFileName(files, fileName);
+        if (optionalFilePath.isEmpty()) {
+            itemReader.setResource(defaultResource);
+            return itemReader;
+        }
+        String filePath = optionalFilePath.get();
+        FileUrlResource urlResource = new FileUrlResource(filePath);
+        log.info("{}-file-exist: {}", fileName, urlResource.exists());
+        itemReader.setResource(urlResource);
         return itemReader;
     }
 
@@ -55,34 +81,37 @@ public class ProductOfferedBatchConfig {
         return lineMapper;
     }
 
+
     @Bean
-    public ProductOfferedProcessor productOfferedProcessor() {
-        return new ProductOfferedProcessor();
+    public AsyncItemProcessor<ProductOfferedInput, ProductsOffered> asyncProductOfferedProcessor() {
+        AsyncItemProcessor<ProductOfferedInput, ProductsOffered> asyncItemProcessor = new AsyncItemProcessor<>();
+        asyncItemProcessor.setDelegate(productOfferedProcessor);
+        asyncItemProcessor.setTaskExecutor(customerTaskExecutor);
+        return asyncItemProcessor;
     }
 
     @Bean
-    public ItemWriter<ProductsOffered> productOfferedWriter() {
-        return list -> list.forEach(productsOffered -> {
-            Optional<Customer> optionalCustomer = customerRepository
-                    .findByCorrelationId(productsOffered.getCustomer().getCorrelationId());
-            if (optionalCustomer.isPresent()) {
-                Customer customer = optionalCustomer.get();
-                productsOffered.setCustomer(customer);
-                HashSet<ProductsOffered> offeredHashSet = new HashSet<>();
-                offeredHashSet.add(productsOffered);
-                customer.setProductsOffered(offeredHashSet);
-                customerRepository.save(customer);
-            }
-            log.info("productsOffered: {}", productsOffered);
-        });
+    public RepositoryItemWriter<ProductsOffered> productOfferedWriter() {
+        RepositoryItemWriter<ProductsOffered> writer = new RepositoryItemWriter<>();
+        writer.setRepository(productOfferedRepository);
+        writer.setMethodName("save");
+        return writer;
+    }
+
+    @Bean
+    public AsyncItemWriter<ProductsOffered> asyncProductOfferedWriter() {
+        AsyncItemWriter<ProductsOffered> asyncItemWriter = new AsyncItemWriter<>();
+        asyncItemWriter.setDelegate(productOfferedWriter());
+        return asyncItemWriter;
     }
 
     @Bean
     public Step productOfferedStep() {
-        return stepBuilderFactory.get("products_offered-csv").<ProductOfferedInput, ProductsOffered>chunk(10)
-                .reader(productOfferedReader(resource))
-                .processor(productOfferedProcessor())
-                .writer(productOfferedWriter())
+        return stepBuilderFactory.get("products_offered-csv").<ProductOfferedInput, Future<ProductsOffered>>chunk(10)
+                .reader(productOfferedReader(null))
+                .processor(asyncProductOfferedProcessor())
+                .writer(asyncProductOfferedWriter())
+                .taskExecutor(customerTaskExecutor)
                 .build();
     }
 

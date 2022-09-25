@@ -1,4 +1,4 @@
-package com.migmeninfo.cipservice.service;
+package com.migmeninfo.cipservice.domain.service;
 
 import com.migmeninfo.cipservice.domain.entity.Customer;
 import com.migmeninfo.cipservice.repository.CustomerRepository;

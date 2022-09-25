@@ -15,6 +15,9 @@ spring:
     job:
       enabled: false
 
+service:
+  storage-endpoint: ${STORAGE_ENDPOINT:-localhost:9000}
+
 batch-data:
   ind: 'classpath:customers_ind.csv'
   org: 'classpath:customers_org.csv'
@@ -27,3 +30,5 @@ batch-data:
   markets_served: 'classpath:markets_served.csv'
   countries_of_operation: 'classpath:countries_of_operation.csv'
   beneficial_owners: 'classpath:beneficial_owners.csv'
+  batch_file: 'classpath:mybatch.zip'
+  default: 'classpath:default.csv'

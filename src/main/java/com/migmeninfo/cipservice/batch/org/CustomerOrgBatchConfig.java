@@ -2,10 +2,14 @@ package com.migmeninfo.cipservice.batch.org;
 
 import com.migmeninfo.cipservice.domain.entity.Customer;
 import com.migmeninfo.cipservice.repository.CustomerRepository;
+import com.migmeninfo.cipservice.utils.BatchUtils;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
-import org.springframework.batch.item.ItemReader;
+import org.springframework.batch.core.configuration.annotation.StepScope;
+import org.springframework.batch.integration.async.AsyncItemProcessor;
+import org.springframework.batch.integration.async.AsyncItemWriter;
 import org.springframework.batch.item.data.RepositoryItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.LineMapper;
@@ -16,9 +20,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.FileUrlResource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.task.TaskExecutor;
 
 import java.util.ArrayList;
+import java.util.Optional;
+import java.util.concurrent.Future;
 
 @Configuration
 @Slf4j
@@ -27,14 +35,32 @@ public class CustomerOrgBatchConfig {
     private StepBuilderFactory stepBuilderFactory;
     @Autowired
     private CustomerRepository customerRepository;
-    @Value("${batch-data.org}")
-    private Resource resource;
 
-    public ItemReader<? extends CustomerOrgInput> customerOrgReader(Resource file) {
+    @Value("${batch-data.default}")
+    private Resource defaultResource;
+
+    @Autowired
+    private TaskExecutor customerTaskExecutor;
+    @Autowired
+    private CustomerOrgProcessor customerOrgProcessor;
+
+    @Bean
+    @StepScope
+    @SneakyThrows
+    public FlatFileItemReader<CustomerOrgInput> customerOrgReader(@Value("#{jobExecutionContext['unzip_files']}") Object files) {
+        String fileName = "customers_org.csv";
         FlatFileItemReader<CustomerOrgInput> itemReader = new FlatFileItemReader<>();
-        itemReader.setResource(file);
-        itemReader.setLinesToSkip(1);
         itemReader.setLineMapper(customerOrgLineMapper());
+        itemReader.setLinesToSkip(1);
+        Optional<String> optionalFilePath = BatchUtils.getBatchFileName(files, fileName);
+        if (optionalFilePath.isEmpty()) {
+            itemReader.setResource(defaultResource);
+            return itemReader;
+        }
+        String filePath = optionalFilePath.get();
+        FileUrlResource urlResource = new FileUrlResource(filePath);
+        log.info("{}-file-exist: {}", fileName, urlResource.exists());
+        itemReader.setResource(urlResource);
         return itemReader;
     }
 
@@ -53,8 +79,11 @@ public class CustomerOrgBatchConfig {
     }
 
     @Bean
-    public CustomerOrgProcessor customerOrgProcessor() {
-        return new CustomerOrgProcessor();
+    public AsyncItemProcessor<CustomerOrgInput, Customer> asyncCustomerOrgProcessor() {
+        AsyncItemProcessor<CustomerOrgInput, Customer> asyncItemProcessor = new AsyncItemProcessor<>();
+        asyncItemProcessor.setDelegate(customerOrgProcessor);
+        asyncItemProcessor.setTaskExecutor(customerTaskExecutor);
+        return asyncItemProcessor;
     }
 
     @Bean
@@ -66,11 +95,19 @@ public class CustomerOrgBatchConfig {
     }
 
     @Bean
+    public AsyncItemWriter<Customer> asyncCustomerOrgWriter() {
+        AsyncItemWriter<Customer> asyncItemWriter = new AsyncItemWriter<>();
+        asyncItemWriter.setDelegate(customerOrgWriter());
+        return asyncItemWriter;
+    }
+
+    @Bean
     public Step customerOrgStep() {
-        return stepBuilderFactory.get("customer-org-csv").<CustomerOrgInput, Customer>chunk(10)
-                .reader(customerOrgReader(resource))
-                .processor(customerOrgProcessor())
-                .writer(customerOrgWriter())
+        return stepBuilderFactory.get("customer-org-csv").<CustomerOrgInput, Future<Customer>>chunk(10)
+                .reader(customerOrgReader(null))
+                .processor(asyncCustomerOrgProcessor())
+                .writer(asyncCustomerOrgWriter())
+                .taskExecutor(customerTaskExecutor)
                 .build();
     }
 

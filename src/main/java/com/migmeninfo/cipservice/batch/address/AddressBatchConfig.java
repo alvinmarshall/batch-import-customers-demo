@@ -1,13 +1,17 @@
 package com.migmeninfo.cipservice.batch.address;
 
 import com.migmeninfo.cipservice.domain.entity.Address;
-import com.migmeninfo.cipservice.domain.entity.Customer;
+import com.migmeninfo.cipservice.repository.AddressRepository;
 import com.migmeninfo.cipservice.repository.CustomerRepository;
+import com.migmeninfo.cipservice.utils.BatchUtils;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
-import org.springframework.batch.item.ItemReader;
-import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.core.configuration.annotation.StepScope;
+import org.springframework.batch.integration.async.AsyncItemProcessor;
+import org.springframework.batch.integration.async.AsyncItemWriter;
+import org.springframework.batch.item.data.RepositoryItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.LineMapper;
 import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
@@ -17,11 +21,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.FileUrlResource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.task.TaskExecutor;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Optional;
+import java.util.concurrent.Future;
 
 @Configuration
 @Slf4j
@@ -30,15 +36,33 @@ public class AddressBatchConfig {
     private StepBuilderFactory stepBuilderFactory;
     @Autowired
     private CustomerRepository customerRepository;
-    @Value("${batch-data.addresses}")
-    private Resource resource;
+    @Autowired
+    private AddressRepository addressRepository;
+    @Value("${batch-data.default}")
+    private Resource defaultResource;
+    @Autowired
+    private TaskExecutor customerTaskExecutor;
 
-
-    public ItemReader<? extends AddressInput> addressReader(Resource file) {
+    @Autowired
+    private AddressProcessor addressProcessor;
+    @Bean
+    @StepScope
+    @SneakyThrows
+    public FlatFileItemReader<AddressInput> addressReader(@Value("#{jobExecutionContext['unzip_files']}") Object files) {
+        String fileName = "addresses.csv";
+        log.info("files: {}", files);
         FlatFileItemReader<AddressInput> itemReader = new FlatFileItemReader<>();
-        itemReader.setResource(file);
         itemReader.setLinesToSkip(1);
         itemReader.setLineMapper(addressLineMapper());
+        Optional<String> optionalFilePath = BatchUtils.getBatchFileName(files, fileName);
+        if (optionalFilePath.isEmpty()) {
+            itemReader.setResource(defaultResource);
+            return itemReader;
+        }
+        String filePath = optionalFilePath.get();
+        FileUrlResource urlResource = new FileUrlResource(filePath);
+        log.info("{}-file-exist: {}", fileName, urlResource.exists());
+        itemReader.setResource(urlResource);
         return itemReader;
     }
 
@@ -57,34 +81,35 @@ public class AddressBatchConfig {
     }
 
     @Bean
-    public AddressProcessor addressProcessor() {
-        return new AddressProcessor();
+    public AsyncItemProcessor<AddressInput, Address> asyncAddressProcessor() {
+        AsyncItemProcessor<AddressInput, Address> asyncItemProcessor = new AsyncItemProcessor<>();
+        asyncItemProcessor.setDelegate(addressProcessor);
+        asyncItemProcessor.setTaskExecutor(customerTaskExecutor);
+        return asyncItemProcessor;
     }
 
     @Bean
-    public ItemWriter<Address> addressWriter() {
-        return list -> list.forEach(address -> {
-            Optional<Customer> optionalCustomer = customerRepository
-                    .findByCorrelationId(address.getCustomer().getCorrelationId());
-            if (optionalCustomer.isPresent()) {
-                Customer customer = optionalCustomer.get();
-                address.setCustomer(customer);
-                HashSet<Address> addresses = new HashSet<>();
-                addresses.add(address);
-                customer.setAddresses(addresses);
-                customerRepository.save(customer);
-            }
+    public RepositoryItemWriter<Address> addressWriter() {
+        RepositoryItemWriter<Address> writer = new RepositoryItemWriter<>();
+        writer.setRepository(addressRepository);
+        writer.setMethodName("save");
+        return writer;
+    }
 
-            log.info("address: {}", address);
-        });
+    @Bean
+    public AsyncItemWriter<Address> asyncAddressWriter() {
+        AsyncItemWriter<Address> asyncItemWriter = new AsyncItemWriter<>();
+        asyncItemWriter.setDelegate(addressWriter());
+        return asyncItemWriter;
     }
 
     @Bean
     public Step addressStep() {
-        return stepBuilderFactory.get("addresses-csv").<AddressInput, Address>chunk(10)
-                .reader(addressReader(resource))
-                .processor(addressProcessor())
-                .writer(addressWriter())
+        return stepBuilderFactory.get("addresses-csv").<AddressInput, Future<Address>>chunk(10)
+                .reader(addressReader(null))
+                .processor(asyncAddressProcessor())
+                .writer(asyncAddressWriter())
+                .taskExecutor(customerTaskExecutor)
                 .build();
     }
 

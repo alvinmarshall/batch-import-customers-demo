@@ -1,9 +1,11 @@
 package com.migmeninfo.cipservice.config;
 
+import com.migmeninfo.cipservice.tasklet.UncompressTasklet;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
+import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +15,8 @@ import org.springframework.context.annotation.Configuration;
 public class CustomerBatchConfig {
     @Autowired
     private JobBuilderFactory jobBuilderFactory;
+    @Autowired
+    private StepBuilderFactory stepBuilderFactory;
     @Autowired
     private Step customerIndStep;
     @Autowired
@@ -33,19 +37,28 @@ public class CustomerBatchConfig {
     private Step marketServedStep;
     @Autowired
     private Step countryOperationStep;
-
+    @Autowired
+    private UncompressTasklet uncompressTasklet;
 
     @Bean
-    public Job runJob() {
+    public Step unCompressBatchFilesStep() {
+        return stepBuilderFactory.get("uncompress-customers-zip")
+                .tasklet(uncompressTasklet)
+                .build();
+    }
+
+    @Bean
+    public Job processCustomerBatchJob() {
         return jobBuilderFactory.get("importCustomers")
-                .flow(customerIndStep)
+                .flow(unCompressBatchFilesStep())
+                .next(customerIndStep)
                 .next(customerOrgStep)
                 .next(addressStep)
-                .next(businessUnitStep)
+//                .next(businessUnitStep)
                 .next(documentStep)
                 .next(accountStep)
                 .next(productOfferedStep)
-                .next(marketServedStep)
+//                .next(marketServedStep)
                 .next(countryOperationStep)
                 .end()
                 .build();
