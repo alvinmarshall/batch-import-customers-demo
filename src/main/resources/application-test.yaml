@@ -19,16 +19,19 @@ service:
   storage-endpoint: ${STORAGE_ENDPOINT:-localhost:9000}
 
 batch-data:
-  ind: 'classpath:customers_ind.csv'
-  org: 'classpath:customers_org.csv'
-  addresses: 'classpath:addresses.csv'
-  business_units: 'classpath:business_units.csv'
-  documents: 'classpath:documents.csv'
-  accounts: 'classpath:accounts.csv'
-  products_offered: 'classpath:products_offered.csv'
-  relationships: 'classpath:relationships.csv'
-  markets_served: 'classpath:markets_served.csv'
-  countries_of_operation: 'classpath:countries_of_operation.csv'
-  beneficial_owners: 'classpath:beneficial_owners.csv'
-  batch_file: 'classpath:mybatch.zip'
+  batch_file: 'file:mybatch.zip'
   default: 'classpath:default.csv'
+  temp-dir: './temp/output'
+
+customer-zip-filename:
+  individual: 'customers_ind.csv'
+  organization: 'customers_org.csv'
+  address: 'addresses.csv'
+  business_unit: 'business_units.csv'
+  document: 'documents.csv'
+  account: 'accounts.csv'
+  product_offered: 'products_offered.csv'
+  relationship: 'relationships.csv'
+  market_served: 'markets_served.csv'
+  country_of_operation: 'countries_of_operation.csv'
+  beneficial_owner: 'beneficial_owners.csv'
