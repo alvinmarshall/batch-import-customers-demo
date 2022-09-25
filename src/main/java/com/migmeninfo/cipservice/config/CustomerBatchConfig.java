@@ -1,5 +1,6 @@
 package com.migmeninfo.cipservice.config;
 
+import com.migmeninfo.cipservice.batch.listener.CustomerBatchJobListener;
 import com.migmeninfo.cipservice.batch.tasklet.UncompressTasklet;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -24,6 +25,7 @@ public class CustomerBatchConfig {
     private final Step marketServedStep;
     private final Step countryOperationStep;
     private final UncompressTasklet uncompressTasklet;
+    private final CustomerBatchJobListener customerBatchJobListener;
 
     public CustomerBatchConfig(
             @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection") JobBuilderFactory jobBuilderFactory,
@@ -37,8 +39,8 @@ public class CustomerBatchConfig {
             Step productOfferedStep,
             Step marketServedStep,
             Step countryOperationStep,
-            UncompressTasklet uncompressTasklet
-    ) {
+            UncompressTasklet uncompressTasklet,
+            CustomerBatchJobListener customerBatchJobListener) {
         this.jobBuilderFactory = jobBuilderFactory;
         this.stepBuilderFactory = stepBuilderFactory;
         this.customerIndStep = customerIndStep;
@@ -51,6 +53,7 @@ public class CustomerBatchConfig {
         this.marketServedStep = marketServedStep;
         this.countryOperationStep = countryOperationStep;
         this.uncompressTasklet = uncompressTasklet;
+        this.customerBatchJobListener = customerBatchJobListener;
     }
 
     @Bean
@@ -74,6 +77,7 @@ public class CustomerBatchConfig {
                 .next(countryOperationStep)
                 .next(businessUnitStep)
                 .end()
+                .listener(customerBatchJobListener)
                 .build();
 
     }

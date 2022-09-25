@@ -12,6 +12,9 @@ public class ThreadConfig {
     @Bean
     public TaskExecutor customerTaskExecutor() {
 //        new SimpleAsyncTaskExecutor("cus_batch");
+//        SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor("cus_batch");
+//        executor.setConcurrencyLimit(10);
+//        return executor;
 
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(5);

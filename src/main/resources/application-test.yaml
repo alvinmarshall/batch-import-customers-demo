@@ -8,10 +8,12 @@ spring:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: update
+    open-in-view: false
 
   batch:
     jdbc:
       initialize-schema: always
+      isolation-level-for-create: default
     job:
       enabled: false
 
@@ -19,7 +21,7 @@ service:
   storage-endpoint: ${STORAGE_ENDPOINT:-localhost:9000}
 
 batch-data:
-  batch_file: 'file:mybatch.zip'
+  batch_file: 'classpath:mybatch.zip'
   default: 'classpath:default.csv'
   temp-dir: './temp/output'
 
