@@ -24,7 +24,8 @@ public class CustomerIndProcessor implements ItemProcessor<CustomerIndInput, Cus
     @Override
     public Customer process(CustomerIndInput customerInput) {
         Optional<Customer> optionalCustomer = customerRepository.findByCorrelationId(customerInput.getCorrelationId());
-        if (optionalCustomer.isPresent()) return optionalCustomer.get();
+        if (optionalCustomer.isPresent())
+            throw new IllegalArgumentException("customer exist: " + customerInput.getFirstName());
         Customer customer = Customer.builder().build();
         BeanUtils.copyProperties(customerInput, customer);
         customer.setMaritalStatus(MaritalStatus.fromString(customerInput.getMaritalStatus()));

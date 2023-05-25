@@ -26,6 +26,12 @@ public class CustomerBatchJobListener implements JobExecutionListener {
     }
 
     private void cleanUpFiles(JobExecution jobExecution) {
+        jobExecution.getFailureExceptions().forEach(throwable -> {
+            log.info("errors: {}", throwable.getMessage());
+        });
+        jobExecution.getAllFailureExceptions().forEach(throwable -> {
+            log.info("errors: {}", throwable.getMessage());
+        });
         Object files = jobExecution.getExecutionContext().get(UncompressTasklet.FILES_EXECUTOR_PARAM);
         if (files instanceof Map) {
             log.info("job has ended {}", files);

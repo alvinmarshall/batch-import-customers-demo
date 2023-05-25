@@ -1,6 +1,7 @@
 package com.migmeninfo.cipservice.config;
 
 import com.migmeninfo.cipservice.batch.listener.CustomerBatchJobListener;
+import com.migmeninfo.cipservice.batch.listener.CustomerJobNotificationListener;
 import com.migmeninfo.cipservice.batch.tasklet.UncompressTasklet;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -26,6 +27,7 @@ public class CustomerBatchConfig {
     private final Step countryOperationStep;
     private final UncompressTasklet uncompressTasklet;
     private final CustomerBatchJobListener customerBatchJobListener;
+    private final CustomerJobNotificationListener customerJobNotificationListener;
 
     public CustomerBatchConfig(
             @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection") JobBuilderFactory jobBuilderFactory,
@@ -40,7 +42,7 @@ public class CustomerBatchConfig {
             Step marketServedStep,
             Step countryOperationStep,
             UncompressTasklet uncompressTasklet,
-            CustomerBatchJobListener customerBatchJobListener) {
+            CustomerBatchJobListener customerBatchJobListener, CustomerJobNotificationListener customerJobNotificationListener) {
         this.jobBuilderFactory = jobBuilderFactory;
         this.stepBuilderFactory = stepBuilderFactory;
         this.customerIndStep = customerIndStep;
@@ -54,6 +56,7 @@ public class CustomerBatchConfig {
         this.countryOperationStep = countryOperationStep;
         this.uncompressTasklet = uncompressTasklet;
         this.customerBatchJobListener = customerBatchJobListener;
+        this.customerJobNotificationListener = customerJobNotificationListener;
     }
 
     @Bean
@@ -66,6 +69,7 @@ public class CustomerBatchConfig {
     @Bean
     public Job processCustomerBatchJob() {
         return jobBuilderFactory.get("importCustomers")
+                .listener(customerJobNotificationListener)
                 .flow(unCompressBatchFilesStep())
                 .next(customerIndStep)
                 .next(customerOrgStep)
